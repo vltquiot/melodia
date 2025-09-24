@@ -1,0 +1,11 @@
+torch>=2.1
+transformers>=4.42.0
+datasets>=2.19.0
+accelerate>=0.32.0
+peft>=0.11.0
+bitsandbytes>=0.43.0
+trl>=0.8.6
+vllm>=0.5.0
+evaluate>=0.4.2
+scikit-learn>=1.4
+wandb>=0.17.0

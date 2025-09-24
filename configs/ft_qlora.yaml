@@ -1,0 +1,48 @@
+base_model: TinyLlama/TinyLlama-1.1B-Chat-v1.0
+output_dir: outputs/tinyllama-1.1b-qlora-style
+seed: 42
+
+max_seq_length: 512
+packing: true
+
+# QLoRA 4-bit
+load_in_4bit: true
+bnb_4bit_quant_type: nf4
+bnb_4bit_use_double_quant: true
+bnb_4bit_compute_dtype: float16   # FP16 (GTX 1650)
+
+# LoRA light
+lora_r: 8
+lora_alpha: 16
+lora_dropout: 0.05
+target_modules: [q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj]
+bias: none
+task_type: CAUSAL_LM
+
+# Training (safe 4 Go VRAM)
+learning_rate: 0.0001
+lr_schedule: cosine
+warmup_ratio: 0.03
+weight_decay: 0.0
+gradient_checkpointing: true
+gradient_accumulation_steps: 16
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 1
+num_train_epochs: 1
+logging_steps: 10
+save_steps: 200
+eval_steps: 200
+save_total_limit: 2
+bf16: false
+fp16: true
+optim: paged_adamw_32bit
+
+# Datasets
+dataset_train_path: data/dolly_2k_chat.jsonl
+dataset_eval_path:  data/val_small.jsonl
+chat_template: "auto"
+report_to: none
+
+# Offload CPU for 4 Go
+device_map: "auto"
+offload_folder: "offload"
