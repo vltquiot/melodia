@@ -38,6 +38,7 @@ fp16: true
 optim: paged_adamw_32bit
 
 # Datasets
+dataset_discogs_path: data/tracks.jsonl
 dataset_train_path: data/dolly_2k_chat.jsonl
 dataset_eval_path:  data/val_small.jsonl
 chat_template: "auto"

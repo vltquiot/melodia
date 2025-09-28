@@ -1,0 +1,1 @@
+Discogs token -> Create a Discogs token (Account -> Settings -> Developers), then: export DISCOGS_TOKEN="YOUR_TOKEN" in shell
