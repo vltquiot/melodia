@@ -1,0 +1,34 @@
+You are a dataset generator. Given metadata of a song/album, generate 10 QA pairs in French. 
+- The user asks a question (French prompt). 
+- The assistant answers in French, with a friendly explanatory tone, using information from the metadata.
+- Include different question types: artist, album, style, recommendation, historical context.
+- Always output JSON with the format {"messages": [{"role": "system", "content": "Tu es un assistant musical. Utilise uniquement les informations ci-dessous."}, {"role": "user", ...}, {"role": "assistant", ...}]}.
+
+Here are some examples for a random song:
+[{"messages": [
+  {"role": "system", "content": "Tu es un assistant musical. Utilise uniquement les informations ci-dessous."},
+  {"role": "user", "content": "Qui est le Chet Baker Quartet ?"},
+  {"role": "assistant", "content": "Le Chet Baker Quartet est un groupe de jazz menée par le trompettiste et chanteur américain Chet Baker. Elle est associée au mouvement du cool jazz, un style plus doux et mélodique que le jazz classique, très populaire en Europe dans les années 1950."}
+]},
+{"messages": [
+  {"role": "system", "content": "Tu es un assistant musical. Utilise uniquement les informations ci-dessous."},
+  {"role": "user", "content": "Peux-tu m’expliquer la chanson *Autumn in New York* interprétée par Chet Baker Quartet ?"},
+  {"role": "assistant", "content": "*Autumn in New York* est un standard de jazz composé en 1934 par Vernon Duke. L’interprétation du Chet Baker Quartet met en avant le style cool jazz, avec un jeu de trompette aérien et une ambiance mélancolique. Elle illustre l’élégance de la scène jazz américaine diffusée en Europe."}
+]},
+{"messages": [
+  {"role": "system", "content": "Tu es un assistant musical. Utilise uniquement les informations ci-dessous."},
+  {"role": "user", "content": "Que représente l’album *Chet Baker Quartet* sorti en 2021 en France ?"},
+  {"role": "assistant", "content": "Cet album est une réédition par Sam Records d’enregistrements historiques du Chet Baker Quartet. Il témoigne de l’impact durable de Baker sur la scène jazz française et rend hommage à l’influence du cool jazz dans l’Europe d’après-guerre."}
+]},
+{"messages": [
+  {"role": "system", "content": "Tu es un assistant musical. Utilise uniquement les informations ci-dessous."},
+  {"role": "user", "content": "Si j’aime Chet Baker, que puis-je écouter d’autre dans le style jazz cool ?"},
+  {"role": "assistant", "content": "Si vous aimez Chet Baker, vous pourriez apprécier Gerry Mulligan, qui a souvent collaboré avec lui, ou encore Miles Davis avec l’album *Birth of the Cool*. Ces artistes partagent le même style cool jazz, caractérisé par des arrangements subtils et une atmosphère détendue."}
+]},
+{"messages": [
+  {"role": "system", "content": "Tu es un assistant musical. Utilise uniquement les informations ci-dessous."},
+  {"role": "user", "content": "Quel est le style musical de la chanson *Small Hotel* du Chet Baker Quartet ?"},
+  {"role": "assistant", "content": "La chanson *Small Hotel* interprétée par le Chet Baker Quartet appartient au style cool jazz et bop. Ce style se distingue par un jeu de trompette fluide, des tempos modérés et une atmosphère intimiste."}
+]}]
+
+Now generate for this song:
