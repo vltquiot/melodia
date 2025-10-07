@@ -1,34 +1,86 @@
-You are a dataset generator. Given metadata of a song/album, generate 10 QA pairs in French. 
-- The user asks a question (French prompt). 
-- The assistant answers in French, with a friendly explanatory tone, using information from the metadata.
-- Include different question types: artist, album, style, recommendation, historical context.
-- Always output JSON with the format {"messages": [{"role": "system", "content": "Tu es un assistant musical. Utilise uniquement les informations ci-dessous."}, {"role": "user", ...}, {"role": "assistant", ...}]}.
+You are a dataset generator for training a music recommendation chatbot.
 
-Here are some examples for a random song:
-[{"messages": [
-  {"role": "system", "content": "Tu es un assistant musical. Utilise uniquement les informations ci-dessous."},
-  {"role": "user", "content": "Qui est le Chet Baker Quartet ?"},
-  {"role": "assistant", "content": "Le Chet Baker Quartet est un groupe de jazz menée par le trompettiste et chanteur américain Chet Baker. Elle est associée au mouvement du cool jazz, un style plus doux et mélodique que le jazz classique, très populaire en Europe dans les années 1950."}
-]},
-{"messages": [
-  {"role": "system", "content": "Tu es un assistant musical. Utilise uniquement les informations ci-dessous."},
-  {"role": "user", "content": "Peux-tu m’expliquer la chanson *Autumn in New York* interprétée par Chet Baker Quartet ?"},
-  {"role": "assistant", "content": "*Autumn in New York* est un standard de jazz composé en 1934 par Vernon Duke. L’interprétation du Chet Baker Quartet met en avant le style cool jazz, avec un jeu de trompette aérien et une ambiance mélancolique. Elle illustre l’élégance de la scène jazz américaine diffusée en Europe."}
-]},
-{"messages": [
-  {"role": "system", "content": "Tu es un assistant musical. Utilise uniquement les informations ci-dessous."},
-  {"role": "user", "content": "Que représente l’album *Chet Baker Quartet* sorti en 2021 en France ?"},
-  {"role": "assistant", "content": "Cet album est une réédition par Sam Records d’enregistrements historiques du Chet Baker Quartet. Il témoigne de l’impact durable de Baker sur la scène jazz française et rend hommage à l’influence du cool jazz dans l’Europe d’après-guerre."}
-]},
-{"messages": [
-  {"role": "system", "content": "Tu es un assistant musical. Utilise uniquement les informations ci-dessous."},
-  {"role": "user", "content": "Si j’aime Chet Baker, que puis-je écouter d’autre dans le style jazz cool ?"},
-  {"role": "assistant", "content": "Si vous aimez Chet Baker, vous pourriez apprécier Gerry Mulligan, qui a souvent collaboré avec lui, ou encore Miles Davis avec l’album *Birth of the Cool*. Ces artistes partagent le même style cool jazz, caractérisé par des arrangements subtils et une atmosphère détendue."}
-]},
-{"messages": [
-  {"role": "system", "content": "Tu es un assistant musical. Utilise uniquement les informations ci-dessous."},
-  {"role": "user", "content": "Quel est le style musical de la chanson *Small Hotel* du Chet Baker Quartet ?"},
-  {"role": "assistant", "content": "La chanson *Small Hotel* interprétée par le Chet Baker Quartet appartient au style cool jazz et bop. Ce style se distingue par un jeu de trompette fluide, des tempos modérés et une atmosphère intimiste."}
-]}]
+TASK: Given metadata of a song/album, generate EXACTLY 10 different QA pairs in French.
 
-Now generate for this song:
+CRITICAL RULES:
+1. ONLY use information that is explicitly present in the metadata provided
+2. If certain information is not available (e.g., song meaning, cultural impact), ask factual questions about what IS available (artist, album, year, genre, duration, label, etc.)
+3. NEVER write incomplete sentences ending with "..."
+4. NEVER make up or infer information not in the metadata
+5. If you cannot provide a complete answer based on the metadata, skip that type of question
+
+REQUIREMENTS:
+- Each QA pair must have: a user question in French, and an assistant answer in French
+- The assistant uses a friendly, conversational tone and bases answers ONLY on the provided metadata
+- Vary the question types: artist name, album name, genre/style, year, label, duration, track position, similar artists (only if metadata contains this), technical details
+- Make questions natural and diverse - avoid repetitive sentence structures
+- Keep answers concise (2-4 sentences maximum) and factual
+
+OUTPUT FORMAT:
+You MUST return a valid JSON array containing exactly 10 objects. Each object has this structure:
+{"messages": [
+  {"role": "system", "content": "Tu es un assistant musical. Utilise uniquement les informations ci-dessous."},
+  {"role": "user", "content": "question en français"},
+  {"role": "assistant", "content": "réponse complète et factuelle en français"}
+]}
+
+VARIETY REQUIREMENTS:
+- RANDOMIZE the order of question types for each track
+- USE DIFFERENT PHRASINGS for similar questions across tracks
+- MIX formal and informal question styles
+- VARY answer lengths (some short, some detailed)
+
+EXAMPLE QUESTION PHRASINGS (show variety in how you ask):
+- "Qui a interprété cette chanson ?" / "Qui est l'artiste de ce morceau ?" / "C'est qui qui chante ça ?"
+- "Quel est le genre musical ?" / "Dans quel style c'est ?" / "Ça ressemble à quel type de musique ?"
+- "C'est sorti quand ?" / "Quelle est l'année de sortie ?" / "En quelle année est sorti l'album ?"
+- "Combien de temps dure la chanson ?" / "Quelle est la durée ?" / "C'est long combien ?"
+- "C'est sur quel label ?" / "Quelle maison de disques ?" / "Quel est le label de l'album ?"
+
+EXAMPLE OUTPUT FORMAT (only 3 shown, you must generate 10):
+[
+  {"messages": [
+    {"role": "system", "content": "Tu es un assistant musical. Utilise uniquement les informations ci-dessous."},
+    {"role": "user", "content": "C'est sorti quand cet album ?"},
+    {"role": "assistant", "content": "L'album est sorti en 2021 en France."}
+  ]},
+  {"messages": [
+    {"role": "system", "content": "Tu es un assistant musical. Utilise uniquement les informations ci-dessous."},
+    {"role": "user", "content": "Peux-tu me parler du style musical de cette chanson ?"},
+    {"role": "assistant", "content": "Cette chanson s'inscrit dans le style cool jazz, un courant du jazz caractérisé par des sonorités plus douces et mélodiques. Le Chet Baker Quartet était particulièrement reconnu pour ce type d'interprétation."}
+  ]},
+  {"messages": [
+    {"role": "system", "content": "Tu es un assistant musical. Utilise uniquement les informations ci-dessous."},
+    {"role": "user", "content": "Qui a interprété ce morceau ?"},
+    {"role": "assistant", "content": "C'est le Chet Baker Quartet qui a interprété ce morceau. Le groupe était dirigé par le trompettiste américain Chet Baker."}
+  ]}
+  ... 7 more varied QA pairs ...
+]
+
+QUESTION TYPE SUGGESTIONS (use ONLY if metadata supports it):
+- Nom de l'artiste/groupe
+- Titre de l'album
+- Genre et style musical
+- Année de sortie
+- Label/maison de disques
+- Durée de la chanson
+- Position dans l'album
+- Pays de sortie
+- Genres musicaux présents
+- Détails sur l'artiste (nationalité, période d'activité)
+
+AVOID these question types unless explicitly in metadata:
+- Song meaning/lyrics interpretation
+- Cultural impact or influence
+- Historical context beyond basic dates
+- Recommendations for similar music
+- Personal opinions or subjective interpretations
+
+IMPORTANT: 
+- Return ONLY the JSON array, no other text
+- Generate exactly 10 diverse QA pairs with complete answers
+- Ensure valid JSON syntax (proper quotes, commas, brackets)
+- NO incomplete sentences with "..."
+- Stay strictly factual based on provided metadata
+
+Now generate 10 QA pairs for this song metadata:

@@ -1,49 +1,54 @@
-import json
-import random
-from pathlib import Path
-from tqdm import tqdm
-from vllm import LLM, SamplingParams
+from openai import OpenAI
+import json, time, random
 
-TRACKS_FILE = Path("data/tracks.jsonl")
-PROMPT_FILE = Path("configs/prompt_for_qa.txt")
-OUTPUT_FILE = Path("data/qa_tracks_recommender.jsonl")
+client = OpenAI(api_key="") #API Key
 
-MODEL_NAME = "mistral-7b-instruct-v0.2"
-NUM_SAMPLES = 1000 #1000*10 pairs => 10k QA 
-MAX_TOKENS = 1024
+with open("configs/prompt_for_qa.txt") as f:
+    base_prompt = f.read()
 
-with TRACKS_FILE.open("r", encoding="utf-8") as f:
+with open("data/tracks.jsonl") as f:
     tracks = [json.loads(line) for line in f]
 
-sampled_tracks = random.sample(tracks, min(NUM_SAMPLES, len(tracks)))
+sampled_tracks = random.sample(tracks, 1000)
 
-with PROMPT_FILE.open("r", encoding="utf-8") as f:
-    base_prompt = f.read().strip()
+out = open("data/qa_tracks_recommender.jsonl", "w")
 
-print("Loading model locally...")
-llm = LLM(model=MODEL_NAME)
+for i, track in enumerate(sampled_tracks):
+    messages = [
+        {"role": "system", "content": base_prompt},
+        {"role": "user", "content": json.dumps(track, ensure_ascii=False)}
+    ]
+    try:
+        completion = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            temperature=0.7
+        )
+        
+        response_content = completion.choices[0].message.content
 
-sampling_params = SamplingParams(
-    temperature=0.7,
-    max_tokens=MAX_TOKENS
-)
+        # Strip any potential markdown code blocks
+        response_content = response_content.strip()
+        if response_content.startswith("```json"):
+            response_content = response_content[7:]
+        if response_content.startswith("```"):
+            response_content = response_content[3:]
+        if response_content.endswith("```"):
+            response_content = response_content[:-3]
+        response_content = response_content.strip()	
 
-with OUTPUT_FILE.open("w", encoding="utf-8") as out_f:
-    for track in tqdm(sampled_tracks, desc="Generating QA"):
-        # Add metadata to the end of the base prompt
-        prompt = f"{base_prompt}\n\n{json.dumps(track, ensure_ascii=False)}"
+        qa_pairs = json.loads(response_content)
+        
+        for qa in qa_pairs:
+            out.write(json.dumps(qa, ensure_ascii=False) + "\n")
+        
+        print(f"{i+1}/{len(sampled_tracks)} done - {len(qa_pairs)} QA pairs generated")
+        
+    except json.JSONDecodeError as e:
+        print(f"Error parsing response for track {i+1}: {e}")
+        print(f"Response was: {response_content}")
+    except Exception as e:
+        print(f"Error processing track {i+1}: {e}")
 
-        outputs = llm.generate([prompt], sampling_params)
-        text = outputs[0].outputs[0].text.strip()
-
-        for line in text.splitlines():
-            line = line.strip()
-            if line:
-                try:
-                    json.loads(line)
-                    out_f.write(line + "\n")
-                except json.JSONDecodeError:
-                    # skip malformed lines
-                    continue
-
-print(f"QA dataset written to {OUTPUT_FILE}")
+out.close()
+print(f"\nTotal: {1000 * 10} QA pairs expected in data/qa_tracks_recommender.jsonl")
