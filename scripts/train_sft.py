@@ -28,7 +28,7 @@ def main():
         quantization_config=bnb,
         device_map="auto",
         offload_folder="offload",
-        torch_dtype=torch.float16,
+        dtype=torch.float16,
     )
 
     lcfg = LoraConfig(
@@ -36,12 +36,13 @@ def main():
         lora_alpha=16,
         lora_dropout=.05,
         target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"],
-        bias=None,
+        bias="none",
         task_type=TaskType.CAUSAL_LM,
     )
 
-    train_ds = load_jsonl("data/qa_tracks_recommender.jsonl").map(lambda ex: {"text": fmt(ex, tok)})[:9000]
-    eval_ds  = load_jsonl("data/qa_tracks_recommender.jsonl").map(lambda ex: {"text": fmt(ex, tok)})[9000:]
+    dataset = load_jsonl("data/qa_tracks_recommender.jsonl").map(lambda ex: {"text": fmt(ex, tok)})
+    train_ds = dataset.select(range(9000))
+    eval_ds  = dataset.select(range(9000, len(dataset)))
 
     targs = SFTConfig(
         output_dir="outputs/tinyllama-1.1b-qlora-style",
@@ -61,7 +62,7 @@ def main():
         warmup_ratio=.03,
         weight_decay=.0,
         gradient_checkpointing=True,
-        report_to=None,
+        gradient_checkpointing_kwargs={"use_reentrant": False},
         optim="paged_adamw_32bit",
         dataset_text_field="text",
         packing=True,

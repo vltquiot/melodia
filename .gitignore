@@ -7,6 +7,8 @@ __pycache__/
 *.so
 
 melodia_env/
+outputs/*
+wandb/
 
 # Distribution / packaging
 .Python
