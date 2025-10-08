@@ -10,8 +10,7 @@ The assistant takes a user’s music taste (genres, moods, favorite artists) and
 
 ### 1. Data Collection
 
-#### 1.1 Metadata (tags, genres, moods, related artists)
-- **[Last.fm API](https://www.last.fm/api)** → song/artist tags, related artists.  
+#### 1.1 Metadata (tags, genres, moods, related artists) 
 - **[Discogs API](https://www.discogs.com/developers/)** → genres, labels, album metadata.  
 
 #### 1.2 Explanations (lyrics, context, reviews)
@@ -23,9 +22,9 @@ The assistant takes a user’s music taste (genres, moods, favorite artists) and
 ### 2. Dataset Generation (QA Style)
 
 Raw data (tags, metadata, explanations) will be converted into **instruction–response pairs**.  
-We will use a **Mistral agent** to generate QA samples automatically.
+We will use the **OpenAI API** to generate QA samples automatically.
 
-#### Input data (shortened version)
+#### Input data (random sample)
 ```json
 Song: "Smells Like Teen Spirit"  
 Tags: grunge, rock, 90s, alternative  
