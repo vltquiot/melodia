@@ -1,4 +1,4 @@
-import argparse, os, json, yaml, torch
+import argparse, os, json, torch
 from datasets import load_dataset
 from transformers import (AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig)
 from trl import SFTTrainer, SFTConfig
@@ -10,67 +10,62 @@ def fmt(example, tok):
     return tok.apply_chat_template(example["messages"], tokenize=False, add_generation_prompt=False)
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--config", default="configs/ft_qlora.yaml")
-    args = ap.parse_args()
-    cfg = yaml.safe_load(open(args.config))
-
-    os.makedirs(cfg["output_dir"], exist_ok=True)
-    os.makedirs(cfg.get("offload_folder","offload"), exist_ok=True)
+    os.makedirs("outputs/tinyllama-1.1b-qlora-tuned", exist_ok=True)
+    os.makedirs("offload", exist_ok=True)
 
     bnb = BitsAndBytesConfig(
-        load_in_4bit=cfg["load_in_4bit"],
-        bnb_4bit_quant_type=cfg["bnb_4bit_quant_type"],
-        bnb_4bit_use_double_quant=cfg["bnb_4bit_use_double_quant"],
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_use_double_quant=True,
         bnb_4bit_compute_dtype=torch.float16
     )
 
-    tok = AutoTokenizer.from_pretrained(cfg["base_model"], use_fast=True)
+    tok = AutoTokenizer.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0", use_fast=True)
     tok.pad_token = tok.eos_token
 
     model = AutoModelForCausalLM.from_pretrained(
-        cfg["base_model"],
+        "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
         quantization_config=bnb,
-        device_map=cfg.get("device_map","auto"),
-        offload_folder=cfg.get("offload_folder","offload"),
+        device_map="auto",
+        offload_folder="offload",
         torch_dtype=torch.float16,
     )
 
     lcfg = LoraConfig(
-        r=cfg["lora_r"],
-        lora_alpha=cfg["lora_alpha"],
-        lora_dropout=cfg["lora_dropout"],
-        target_modules=cfg["target_modules"],
-        bias=cfg["bias"],
+        r=8,
+        lora_alpha=16,
+        lora_dropout=.05,
+        target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"],
+        bias=None,
         task_type=TaskType.CAUSAL_LM,
     )
 
-    train_ds = load_jsonl(cfg["dataset_train_path"]).map(lambda ex: {"text": fmt(ex, tok)})
-    eval_ds  = load_jsonl(cfg["dataset_eval_path"]).map(lambda ex: {"text": fmt(ex, tok)})
+    train_ds = load_jsonl("data/qa_tracks_recommender.jsonl").map(lambda ex: {"text": fmt(ex, tok)})[:9000]
+    eval_ds  = load_jsonl("data/qa_tracks_recommender.jsonl").map(lambda ex: {"text": fmt(ex, tok)})[9000:]
 
     targs = SFTConfig(
-        output_dir=cfg["output_dir"],
-        per_device_train_batch_size=cfg["per_device_train_batch_size"],
-        per_device_eval_batch_size=cfg["per_device_eval_batch_size"],
-        gradient_accumulation_steps=cfg["gradient_accumulation_steps"],
-        learning_rate=cfg["learning_rate"],
-        num_train_epochs=cfg["num_train_epochs"],
-        logging_steps=cfg["logging_steps"],
-        save_steps=cfg["save_steps"],
+        output_dir="outputs/tinyllama-1.1b-qlora-style",
+        per_device_train_batch_size=1,
+        per_device_eval_batch_size=1,
+        gradient_accumulation_steps=16,
+        learning_rate=.0001,
+        num_train_epochs=1,
+        logging_steps=10,
+        save_steps=200,
         eval_strategy="steps",
-        eval_steps=cfg["eval_steps"],
-        save_total_limit=cfg["save_total_limit"],
-        fp16=cfg["fp16"],
-        bf16=cfg["bf16"],
-        lr_scheduler_type=cfg["lr_schedule"],
-        warmup_ratio=cfg["warmup_ratio"],
-        weight_decay=cfg["weight_decay"],
-        gradient_checkpointing=cfg["gradient_checkpointing"],
-        report_to=cfg.get("report_to", "none"),
-        optim=cfg.get("optim", "paged_adamw_32bit"),
+        eval_steps=200,
+        save_total_limit=2,
+        fp16=True,
+        bf16=False,
+        lr_scheduler_type="cosine",
+        warmup_ratio=.03,
+        weight_decay=.0,
+        gradient_checkpointing=True,
+        report_to=None,
+        optim="paged_adamw_32bit",
         dataset_text_field="text",
-        packing=cfg["packing"],
-        max_length=cfg["max_seq_length"]
+        packing=True,
+        max_length=512
     )
 
     trainer = SFTTrainer(
@@ -83,9 +78,9 @@ def main():
     )
 
     trainer.train()
-    trainer.save_model(cfg["output_dir"])
-    tok.save_pretrained(cfg["output_dir"])
-    print("Adapter saved in:", cfg["output_dir"])
+    trainer.save_model("outputs/tinyllama-1.1b-qlora-style")
+    tok.save_pretrained("outputs/tinyllama-1.1b-qlora-style")
+    print("Adapter saved in: outputs/tinyllama-1.1b-qlora-style")
 
 if __name__ == "__main__":
     main()
