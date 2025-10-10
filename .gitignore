@@ -9,6 +9,8 @@ __pycache__/
 melodia_env/
 outputs/*
 wandb/
+data/tracks_infos/*
+data/artists_infos/*
 
 # Distribution / packaging
 .Python
