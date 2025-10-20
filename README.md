@@ -1,104 +1,172 @@
-
 # 🎵 Melodia - Music Recommender & Explainer (LLM Fine-tuning Project)
 
-This project aims to build a **music recommender / explainer assistant** powered by a fine-tuned LLM.  
-The assistant takes a user’s music taste (genres, moods, favorite artists) and recommends songs with **contextual explanations** (tags, history, lyrics meaning, etc.).
+This project builds a **French music recommendation and explanation assistant** powered by a fine-tuned LLM with RAG (Retrieval-Augmented Generation). The assistant recommends songs and provides contextual explanations based on user preferences, enhanced by real-time knowledge retrieval from a music database.
 
 ---
 
-## 📌 Project Pipeline
+## 📌 Project Overview
+
+Melodia combines:
+- **Fine-tuned TinyLlama model** - Specialized for French music Q&A
+- **RAG system with FAISS** - Retrieves relevant information from artist/track databases
+- **QLoRA training** - Memory-efficient 4-bit quantization for training on limited hardware
+- **Interactive CLI** - Simple command-line interface for local usage
+
+---
+
+## 🛠️ Implementation Pipeline
 
 ### 1. Data Collection
 
-#### 1.1 Metadata (tags, genres, moods, related artists) 
-- **[Discogs API](https://www.discogs.com/developers/)** → genres, labels, album metadata.  
+#### 1.1 Track Metadata
+- **[Discogs API](https://www.discogs.com/developers/)** - Retrieved metadata for French songs (genres, labels, release dates, etc.)
+- Output: `tracks.jsonl` with comprehensive track information
 
-#### 1.2 Explanations (lyrics, context, reviews)
-- **[Genius API](https://docs.genius.com/)** → lyrics + annotations/explanations.  
-- **Wikipedia** → artist/album pages for history and cultural impact.  
+#### 1.2 Knowledge Base for RAG
+- **Wikipedia API** - Retrieved contextual information for:
+  - Individual tracks → `data/tracks_infos/*.txt`
+  - Artists → `data/artists_infos/*.txt`
+- Purpose: Provide rich context for the RAG system to enhance model responses
 
 ---
 
-### 2. Dataset Generation (QA Style)
+### 2. Dataset Generation (QA Format)
 
-Raw data (tags, metadata, explanations) will be converted into **instruction–response pairs**.  
-We will use the **OpenAI API** to generate QA samples automatically.
+The training dataset was generated using the **ChatGPT API** to create question-answer pairs in French from the collected track metadata.
 
-#### Input data (random sample)
-```json
-Song: "Smells Like Teen Spirit"  
-Tags: grunge, rock, 90s, alternative  
-Description: Anthem of Generation X, Nirvana’s breakout hit in 1991.
-```
-
-#### Example 1: Recommender
+#### Dataset Format
 ```json
 {
-  "conversations": [
-    {"from": "user", "value": "I like 90s grunge rock. What song should I listen to?"},
-    {"from": "assistant", "value": "You might enjoy 'Smells Like Teen Spirit' by Nirvana. It’s a grunge anthem from the 90s that defined the alternative rock scene."}
+  "messages": [
+    {"role": "system", "content": "Tu es un assistant musical. Utilise uniquement les informations ci-dessous."},
+    {"role": "user", "content": "Qui sont les artistes principaux de la chanson 'L'avenir Est A Nous' ?"},
+    {"role": "assistant", "content": "Les artistes principaux de la chanson 'L'avenir Est A Nous' sont..."}
   ]
 }
 ```
 
-#### Example 2: Explainer
-```json
-{
-  "conversations": [
-    {"from": "user", "value": "Can you explain 'Smells Like Teen Spirit'?"},
-    {"from": "assistant", "value": "It was released in 1991 as Nirvana’s breakout hit. Known as an anthem for Generation X, its raw energy and distorted guitars shaped the grunge movement."}
-  ]
-}
-```
-
-The dataset will be stored in **JSONL format**.
+**Key characteristics:**
+- All conversations in **French**
+- Mix of recommendation requests and explanatory questions
+- Based on real French music catalog from Discogs
+- Output: `qa_tracks_recommender.jsonl` with comprehensive track information
 
 ---
 
-### 3. Fine-tuning
+### 3. Model Fine-tuning
 
-- **Base model**: [`TinyLlama/TinyLlama-1.1B-intermediate`](https://huggingface.co/TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T)  
-- **Training method**:  
-  - QLoRA + `bitsandbytes` (4-bit quantization)  
-  - PEFT (LoRA adapters)  
-  - Gradient checkpointing + CPU offloading (to fit in 4 GB VRAM)  
-- **Steps**:  
-  1. Phase 1: Instruction tuning (Alpaca-style).  
-  2. Phase 2: Specialization on **music QA dataset**.  
+#### Base Model
+- **[TinyLlama-1.1B-Chat-v1.0](https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0)**
 
----
+#### Training Configuration
+- **Method**: QLoRA (Quantized Low-Rank Adaptation)
+- **Quantization**: 4-bit with `bitsandbytes`
+- **Framework**: Hugging Face PEFT (Parameter-Efficient Fine-Tuning)
+- **LoRA adapters**: Saved in `output/` directory
+- **Training focus**: French music recommendations and explanations
 
-### 4. Deployment (Optional)
-
-If time allows:  
-- Wrap the fine-tuned model in a **chat interface** (React frontend or [Gradio](https://www.gradio.app/) demo).  
-- Example demo prompts:  
-  - *“I like chill indie with female vocals, what should I listen to?”*  
-  - *“Can you explain why ‘Bohemian Rhapsody’ is so unique?”*  
-  - *“I love electronic music with strong bass, recommend me 3 songs.”*
+#### Training optimizations:
+- 4-bit quantization for memory efficiency
+- LoRA adapters to reduce trainable parameters
+- Gradient checkpointing to fit in limited VRAM (4GB in my case)
 
 ---
 
-## 🚀 Why this project?
+### 4. RAG System
 
-- **Fun & relatable**: everyone has music preferences.  
-- **End-to-end pipeline**: scraping → dataset creation → fine-tuning → demo.  
-- **Custom tone**: recommendations + explanations, not just raw metadata.  
-- **Great showcase**: demonstrates skills in data engineering, LLM training, and frontend integration.  
+#### Architecture
+1. **Document Processing**
+   - Load all `.txt` files from `data/tracks_infos/` and `data/artists_infos/`
+   - Split documents into chunks (500 chars with 50 char overlap)
+
+2. **Embedding & Indexing**
+   - Embedding model: `sentence-transformers/all-MiniLM-L6-v2`
+   - Vector store: FAISS (Facebook AI Similarity Search)
+   - Batch processing (500 chunks per batch) to handle large datasets efficiently
+
+3. **Retrieval at Inference**
+   - User query → Embed query → Search FAISS index
+   - Retrieve top-K most relevant context chunks
+   - Feed context + query to fine-tuned model
+   - Generate enhanced response
+
+#### Scripts
+- **`scripts/check_gpu.py`** - Tool to check if the cuda environement is working
+- **`scripts/count_lines.py`** - Tool to check the size of a given file (for the size of the jsonl files)
+- **`scripts/create_faiss_indexes.py`** - Creates and saves FAISS index (run once or when data changes)
+- **`scripts/create_faiss_indexes.py`** - Creates and saves FAISS index (run once or when data changes)
+- **`scripts/generate_qa.py`** - Generate the QA dataset with the tracks using ChatGPT API
+- **`scripts/music_recommender.py`** - Loads model + index and provides interactive Q&A
+- **`scripts/parse_tracks_meta.py`** - Retrieve the french tracks metadata from Discogs API
+- **`scripts/parse_wikipedia.py`** - Retrieve the txt files about all tracks and artists using Wikipedia API
+- **`scripts/train_sft.py`** - Fine-tune the model and put the results in `output/`
 
 ---
 
-## 📂 Repo Structure (planned)
+## 🎯 Key Features
 
-```
-melodia/
-│── config/              # Requirements and variables
-│── data/                # Raw + processed datasets (JSONL)
-│── scripts/             # Scraping + preprocessing
-│── training/            # Fine-tuning scripts (QLoRA)
-│── output/              # Final trained model + LoRA adapters
-│── frontend/            # Chat interface (optional)
-│── README.md            # Project documentation
-```
+✅ **Specialized French music assistant** - Trained specifically on French music Q&A  
+✅ **RAG-enhanced responses** - Retrieves real information from 19,000+ documents  
+✅ **Memory-efficient** - QLoRA allows training on consumer hardware  
+✅ **Fast inference** - Pre-built FAISS index for instant retrieval  
+✅ **Local execution** - No external API calls during inference  
+✅ **Interactive CLI** - Simple command-line interface for testing
+
 ---
+
+## 📊 Technical Details
+
+| Component | Technology |
+|-----------|------------|
+| Base Model | TinyLlama-1.1B-Chat-v1.0 |
+| Fine-tuning | QLoRA (4-bit) with PEFT |
+| Embedding Model | all-MiniLM-L6-v2 |
+| Vector Store | FAISS |
+| Chunking | RecursiveCharacterTextSplitter (500/50) |
+| RAG Framework | LangChain |
+| Language | French |
+
+---
+
+## 🔄 Potential Improvements
+
+### Data Quality Enhancement
+The current RAG knowledge base uses Wikipedia API data, which includes some irrelevant information. Future improvements could include:
+
+1. **Better data filtering** - Implement relevance scoring to filter out low-quality Wikipedia articles
+2. **Additional sources** - Integrate Genius API for lyrics and song explanations
+3. **Hybrid RAG approach** - Combine pre-built knowledge base with real-time API calls for new/trending songs (see: [Hybrid RAG Enhancement Documentation](./docs/hybrid_rag_approach.md))
+4. **Manual curation** - Review and curate high-quality artist/track descriptions
+5. **Structured data extraction** - Parse Wikipedia infoboxes for more precise information
+
+### Model Improvements
+- Fine-tune on larger dataset with more diverse music genres
+- Experiment with larger base models (e.g., Mistral-7B)
+- Multi-task training (recommendation + explanation + genre classification)
+
+---
+
+## 🚀 Why This Project?
+
+- **End-to-end ML pipeline** - Data collection → Dataset creation → Fine-tuning → RAG → Inference
+- **Practical use case** - Music recommendation is relatable and fun
+- **French NLP** - Specialized for French language understanding
+- **RAG implementation** - Demonstrates knowledge retrieval and augmented generation
+- **Efficient training** - Shows how to fine-tune LLMs on consumer hardware
+
+---
+
+## 🎓 Learning Outcomes
+
+This project demonstrates:
+- API integration (Discogs, Wikipedia, ChatGPT)
+- Dataset generation with LLMs
+- Parameter-efficient fine-tuning (QLoRA)
+- RAG system implementation
+- Vector databases and similarity search
+- Memory optimization for large-scale indexing
+- End-to-end ML system design
+
+---
+
 *Note: This README was co-written with an LLM for clarity and structure.*

@@ -13,6 +13,7 @@ data/tracks_infos/*
 data/artists_infos/*
 
 # Distribution / packaging
+faiss_index/
 .Python
 build/
 develop-eggs/
