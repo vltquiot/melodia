@@ -2,9 +2,12 @@ import os
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from peft import PeftModel
+from langchain_community.vectorstores import FAISS
+from langchain_huggingface import HuggingFaceEmbeddings
 
 BASE_MODEL_NAME = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 ADAPTER_PATH = "outputs/tinyllama-1.1b-qlora-style/"
+FAISS_INDEX_PATH = "faiss_index"
 
 TOP_K_RETRIEVAL = 3
 
@@ -40,18 +43,66 @@ def load_model_and_tokenizer():
     print("Model loaded successfully!")
     return model, tokenizer
 
-def format_prompt(query, tokenizer):
+def load_faiss_index():
+    if not os.path.exists(FAISS_INDEX_PATH):
+        raise FileNotFoundError(
+            f"FAISS index not found at '{FAISS_INDEX_PATH}'!\n"
+            f"Please run 'create_faiss_indexes.py' first to create the index."
+        )
+    
+    print(f"Loading FAISS index from {FAISS_INDEX_PATH}...")
+    
+    embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2",
+        model_kwargs={'device': DEVICE}
+    )
+    
+    vectorstore = FAISS.load_local(
+        FAISS_INDEX_PATH, 
+        embeddings,
+        allow_dangerous_deserialization=True
+    )
+    
+    print(f"FAISS index loaded successfully!")
+    print(f"  - Index contains {vectorstore.index.ntotal} vectors")
+    
+    return vectorstore
 
-    messages = [
-        {
-            "role": "system",
-            "content": "You are a music recommendation assistant. Use the provided context to answer questions about songs, artists, and music recommendations. Be helpful and informative."
-        },
-        {
-            "role": "user",
-            "content": query
-        }
-    ]
+def retrieve_relevant_context(query, vectorstore, top_k=TOP_K_RETRIEVAL):
+    results = vectorstore.similarity_search(query, k=top_k)
+    
+    context_parts = []
+    for i, doc in enumerate(results):
+        source = doc.metadata.get('source', 'Unknown')
+        context_parts.append(f"[Source: {source}]\n{doc.page_content}")
+    
+    context = "\n\n".join(context_parts)
+    return context, results
+
+def format_prompt(query, tokenizer, context=None):
+
+    if context:
+        messages = [
+            {
+                "role": "system",
+                "content": "Tu es un assistant musical. Utilise uniquement les informations ci-dessous."
+            },
+            {
+                "role": "user",
+                "content": f"Contexte:\n{context}\n\nQuestion: {query}"
+            }
+        ]
+    else :
+        messages = [
+            {
+                "role": "system",
+                "content": "Tu es un assistant musical. Utilise uniquement les informations ci-dessous."
+            },
+            {
+                "role": "user",
+                "content": query
+            }
+        ]
 
     prompt = tokenizer.apply_chat_template(
         messages,
@@ -86,19 +137,37 @@ def generate_response(model, tokenizer, prompt):
     
     return response
 
-def ask_question(query, model, tokenizer, verbose=True):
+def ask_question(query, model, tokenizer, vectorstore=None, verbose=True):
     if verbose:
         print(f"\n{'='*60}")
         print(f"Question: {query}")
         print(f"{'='*60}")
+
+    if vectorstore is not None:
+        if verbose:
+            print("\nRetrieving relevant context from knowledge base...")
+        
+        context, retrieved_docs = retrieve_relevant_context(query, vectorstore)
+        
+        if verbose:
+            print(f"Retrieved {len(retrieved_docs)} relevant documents")
+            for i, doc in enumerate(retrieved_docs, 1):
+                source = doc.metadata.get('source', 'Unknown')
+                folder = doc.metadata.get('folder', '')
+                print(f"  {i}. {source} (from {folder})")
     
-    if verbose:
-        print("\nFormatting prompt with context...")
-    
-    prompt = format_prompt(query, tokenizer)
-    
-    if verbose:
-        print("\nGenerating response...")
+        if verbose:
+            print("\nFormatting prompt with context...")
+        
+        prompt = format_prompt(query, tokenizer, context)
+        
+        if verbose:
+            print("\nGenerating response...")
+    else:
+        if verbose:
+            print("\nNo RAG context available, using model knowledge only...")
+        
+        prompt = format_prompt(query, tokenizer)
     
     response = generate_response(model, tokenizer, prompt)
     
@@ -111,13 +180,20 @@ def ask_question(query, model, tokenizer, verbose=True):
     
     return response
 
-def main():
+if __name__ == "__main__":
     print("\n" + "="*60)
     print("MUSIC RECOMMENDATION")
     print("="*60 + "\n")
     
     try:
-        print("\nSTEP 1: Loading fine-tuned model...")
+        print("Loading FAISS index...")
+        try:
+            vectorstore = load_faiss_index()
+        except FileNotFoundError as e:
+            print("Continuing without RAG (model knowledge only)...\n")
+            vectorstore = None
+
+        print("\nLoading fine-tuned model...")
         model, tokenizer = load_model_and_tokenizer()
         
         print("\n" + "="*60)
@@ -135,7 +211,7 @@ def main():
                 if not user_query:
                     continue
                 
-                ask_question(user_query, model, tokenizer)
+                ask_question(user_query, model, tokenizer, vectorstore)
                 
             except KeyboardInterrupt:
                 print("\n\nGoodbye!")
@@ -146,7 +222,3 @@ def main():
     except Exception as e:
         print(f"\nError: {e}")
         print("\nSomething went wrong. Please check your configuration.")
-
-
-if __name__ == "__main__":
-    main()
